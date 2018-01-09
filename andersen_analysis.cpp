@@ -17,10 +17,10 @@ public:
     AndersenPA() : ModulePass(ID) {}
     bool runOnModule(Module &M) {
        errs() << "Andersen Alias Analysis: \n\n";
-//        errs().write_escaped(M.getName()) << "\n";
-    	//M.dump();
+
         for(Module::global_iterator G = M.global_begin(), GE = M.global_end(); G != GE; G++){
-            if(!G->getValueType()->isStructTy()){
+            //for globle value
+            if(!G->getValueType()->isStructTy()){ //struct need to be handled diffirently
                 string gName = "_global_@";
                 gName += G->getName();
                 string objName = getObject();
@@ -30,14 +30,12 @@ public:
             }
         }
     	for (Module::iterator F = M.begin(), FE = M.end(); F != FE; F++) {
-            createInitialConstraints(*F, false);
+            createInitialConstraints(*F, false); //creat constraints from llvm
         }
         //printInfo(nodes, constraints, edges);
-
-
         solveCallBind(false);
+        //printInfo(nodes, constraints, edges);
 
-        printInfo(nodes, constraints, edges);
         set<Pointer>::iterator b = nodes.begin();
 	    set<Pointer>::iterator e = nodes.end();
 	    for(; b != e; b++){
@@ -91,9 +89,7 @@ private:
 		}
 	}
     void solveCallBind(bool isPrint){
-        // for(map<string, vector<string>>::iterator i = CallValueBind.begin(), e = CallValueBind.end(); i != e; i++){
-        //     errs() << "CallValueBind: " << i->first << "\n";
-        // }
+
         map<string,string> constraintAppend;
         if(isPrint)
             errs() << "solve call bind in constraints:\n";
@@ -132,9 +128,7 @@ private:
                 errs() << "addConstraint: " << mi->first << " = " << mi->second << "\n";
             addConstraint(mi->first, mi->second, constraints);
         }
-        // for(map<string, vector<string>>::iterator i = CallValueBind.begin(), e = CallValueBind.end(); i != e; i++){
-        //     errs() << "CallValueBind: " << i->first << "\n";
-        // }
+
         if(isPrint)
             errs() << "solve call bind in nodes:\n";
         for(set<Pointer>::iterator i = nodes.begin(); i != nodes.end(); i++){
@@ -148,8 +142,6 @@ private:
 };
 
 void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
-
-//    StringRef FuncName = F.getName();
 
     for (Function::iterator B = F.begin(), BE = F.end(); B != BE; B++) {
     	string funcName = F.getName().str();
@@ -167,7 +159,7 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                     	valueName += I->getName();
 
                     	
-                    	errs() << "newNode: " << oName << "\n";
+                    	//errs() << "newNode: " << oName << "\n";
                         if(isPrint)
                     	   errs() << "addrNode: " <<  valueName  << " = &" << oName << "\n";
                         addNodeValue(oName, isPrint);
@@ -202,17 +194,15 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                             }
                         }
                     }
-                    // v->dump();
-                    // ptr->dump();
                 }
                 break;
                 case Instruction::Store:
                 {
                 	StoreInst *SI = dyn_cast<StoreInst>(I);
-                	;
+    
                 	Value *v = SI->getValueOperand();
                     Value *ptr = SI->getPointerOperand();
-                    errs() << "store: " << ptr->getName() << " = " << v->getName() << "\n";
+                    //errs() << "store: " << ptr->getName() << " = " << v->getName() << "\n";
                     if(ConstantExpr *CE = dyn_cast<ConstantExpr>(v)){
                         if(CE->getOpcode() == Instruction::GetElementPtr){
                             //CE->dump();
@@ -268,17 +258,13 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                     //errs() << "here\n";
                     string valueName = "";
                     string ptrName;
-                    // while(v->getValueID() == (Value::InstructionVal + Instruction::GetElementPtr)){
-                    //     v = GEPValueMap[v];
-                    // }
+
                     while(GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(v)){
 
                         if(GEPValueMap.find(v) != GEPValueMap.end())
                             v = GEPValueMap[v];
                     }
-                    // while(ptr->getValueID() == (Value::InstructionVal + Instruction::GetElementPtr)){
-                    //     ptr = GEPValueMap[ptr];
-                    // }
+
                     while(GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(ptr)){
                         if(GEPValueMap.find(ptr) != GEPValueMap.end())
                             ptr = GEPValueMap[ptr];
@@ -418,16 +404,6 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                     string ptrName;
 
                     while(GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(ptr)){
-                        // if(Instruction *I = dyn_cast<Instruction>(GEPValueMap[ptr])){
-                        //     if(AllocaInst *AI = dyn_cast<AllocaInst>(I)){
-                        //         if(AI->getAllocatedType()->isStructTy()){
-                        //             if(ConstantInt *CI = dyn_cast<ConstantInt>(GEPI->getOperand(2))){
-                        //                 uint64_t Idx = CI->getZExtValue();
-                        //                 errs() << GEPValueMap[ptr]->getName() << "._element_" << Idx << "\n";
-                        //             }
-                        //         }
-                        //     }
-                        // }
                         if(GEPValueMap.find(ptr) != GEPValueMap.end())
                             ptr = GEPValueMap[ptr];
                     }
@@ -437,7 +413,7 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                             string temp = getTempPointer();
                             TempValues[v] = temp;
                             valueName = temp;
-                           	//errs() << "newNode: " << temp << "\n";
+ 
                         }
                         else{
                             valueName = TempValues[v];
@@ -507,19 +483,12 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                     Function *FuncCalled = CI->getCalledFunction();
 
                     string calledFuncName = FuncCalled->getName().str();
-                    // Value *retValue = CI->getReturnedArgOperand();
-                    // errs() << "return value: " << retValue->getName() << "\n";
+
                     Value *CalledValue = CI;
                     
-                    //errs() <<"999999 : " << CalledValue->getName() << "\n";
                     if (CalledValue->hasName()) {
                         //errs() << "Call:" << CalledValue->getName() << "\n";
                         callValue.push_back(CalledValue);
-                    	// if(CalledValue->getType()->isPointerTy())
-	                    //     ;
-	                    // else {
-	                    //     break;
-	                    // }
                     	string calledValueName = CalledValue->getName();
                     	
                         if(isPrint)
