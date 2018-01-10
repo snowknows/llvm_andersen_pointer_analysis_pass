@@ -20,6 +20,7 @@ andersen's pointer analysis base on llvm's ModulePass
     *全局结构体（solved）<br>
     *结构体数组中的指针情况（unsolve）<br>
     *函数指针（unsolve）<br>
+    *库函数，如malloc （unsolve）<br>
 
 ## 文件关系？
 andersen.cpp: 实现了andersen算法和算法所需的数据结构，可以独立运行。只需要在init()函数中设定好所需的andersen约束关系<br>
@@ -95,5 +96,5 @@ makefile: 生成可load的pass库，需要修改其中的LLVM_INCLUDE和LLVM_LIB
     swap@t -> {main@a1, main@b1, }
     
 ## 其他
-在ModelePass的runOnModule函数中很多函数都有一个bool参数，这个是指示是否输出相应运行时信息的选项，你可以设置true来得到相应运行时信息，或者false屏蔽。
-
+在ModelePass的runOnModule函数中很多函数都有一个bool参数，这个是指示是否输出相应运行时信息的选项，你可以设置true来得到相应运行时信息，或者false屏蔽。<br>
+本工程只与llvm的中间代码表示有关，与llvm版本无关。目前测试4.0.0和5.0.0均正常运行。
