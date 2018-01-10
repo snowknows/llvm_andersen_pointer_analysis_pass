@@ -17,10 +17,10 @@ public:
     AndersenPA() : ModulePass(ID) {}
     bool runOnModule(Module &M) {
        errs() << "Andersen Alias Analysis: \n\n";
-
+//        errs().write_escaped(M.getName()) << "\n";
+    	//M.dump();
         for(Module::global_iterator G = M.global_begin(), GE = M.global_end(); G != GE; G++){
-            //for globle value
-            if(!G->getValueType()->isStructTy()){ //struct need to be handled diffirently
+            if(!G->getValueType()->isStructTy()){
                 string gName = "_global_@";
                 gName += G->getName();
                 string objName = getObject();
@@ -30,12 +30,16 @@ public:
             }
         }
     	for (Module::iterator F = M.begin(), FE = M.end(); F != FE; F++) {
-            createInitialConstraints(*F, false); //creat constraints from llvm
+            createInitialConstraints(*F, false);
         }
-        //printInfo(nodes, constraints, edges);
-        solveCallBind(false);
-        //printInfo(nodes, constraints, edges);
+     //    printInfo(nodes, constraints, edges);
 
+
+        solveCallBind(false);
+
+        doRobust(false);
+
+        //printInfo(nodes, constraints, edges);
         set<Pointer>::iterator b = nodes.begin();
 	    set<Pointer>::iterator e = nodes.end();
 	    for(; b != e; b++){
@@ -89,7 +93,9 @@ private:
 		}
 	}
     void solveCallBind(bool isPrint){
-
+        // for(map<string, vector<string>>::iterator i = CallValueBind.begin(), e = CallValueBind.end(); i != e; i++){
+        //     errs() << "CallValueBind: " << i->first << "\n";
+        // }
         map<string,string> constraintAppend;
         if(isPrint)
             errs() << "solve call bind in constraints:\n";
@@ -128,7 +134,9 @@ private:
                 errs() << "addConstraint: " << mi->first << " = " << mi->second << "\n";
             addConstraint(mi->first, mi->second, constraints);
         }
-
+        // for(map<string, vector<string>>::iterator i = CallValueBind.begin(), e = CallValueBind.end(); i != e; i++){
+        //     errs() << "CallValueBind: " << i->first << "\n";
+        // }
         if(isPrint)
             errs() << "solve call bind in nodes:\n";
         for(set<Pointer>::iterator i = nodes.begin(); i != nodes.end(); i++){
@@ -139,9 +147,42 @@ private:
             }
         }
     }
+    void doRobust(bool isPrint){
+        for(set<Pointer>::iterator i = nodes.begin(), e = nodes.end(); i != e; i++){
+            if(isContainAt((*i).sid)){
+                if((*i).pts.empty()){
+                    
+                    string objName = getObject();
+                    addNodeValue(objName, isPrint);
+                    addrNode((*i).sid, objName, nodes);
+                    if(isPrint){
+                        errs() << "need doRobust: " << (*i).sid << "\n";
+                        errs() << "addrNode: " <<  (*i).sid  << " = &" << objName << "\n";
+                    }
+                }
+            }
+        }
+    }
 };
 
 void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
+
+//    StringRef FuncName = F.getName();
+    string argc = "main@argc";  
+    string argc_obj = getObject();
+    addNodeValue(argc, isPrint);
+    addNodeValue(argc_obj, isPrint);
+    addrNode(argc, argc_obj, nodes);
+    if(isPrint)
+        errs() << "addrNode: " <<  argc  << " = &" << argc_obj << "\n";
+
+    string argv = "main@argv";
+    string argv_obj = getObject();
+    addNodeValue(argv, isPrint);
+    addNodeValue(argv_obj, isPrint);
+    addrNode(argv, argv_obj, nodes);
+    if(isPrint)
+        errs() << "addrNode: " <<  argv  << " = &" << argv_obj << "\n";
 
     for (Function::iterator B = F.begin(), BE = F.end(); B != BE; B++) {
     	string funcName = F.getName().str();
@@ -194,12 +235,14 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                             }
                         }
                     }
+                    // v->dump();
+                    // ptr->dump();
                 }
                 break;
                 case Instruction::Store:
                 {
                 	StoreInst *SI = dyn_cast<StoreInst>(I);
-    
+                	;
                 	Value *v = SI->getValueOperand();
                     Value *ptr = SI->getPointerOperand();
                     //errs() << "store: " << ptr->getName() << " = " << v->getName() << "\n";
@@ -258,13 +301,17 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                     //errs() << "here\n";
                     string valueName = "";
                     string ptrName;
-
+                    // while(v->getValueID() == (Value::InstructionVal + Instruction::GetElementPtr)){
+                    //     v = GEPValueMap[v];
+                    // }
                     while(GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(v)){
 
                         if(GEPValueMap.find(v) != GEPValueMap.end())
                             v = GEPValueMap[v];
                     }
-
+                    // while(ptr->getValueID() == (Value::InstructionVal + Instruction::GetElementPtr)){
+                    //     ptr = GEPValueMap[ptr];
+                    // }
                     while(GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(ptr)){
                         if(GEPValueMap.find(ptr) != GEPValueMap.end())
                             ptr = GEPValueMap[ptr];
@@ -404,6 +451,16 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                     string ptrName;
 
                     while(GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(ptr)){
+                        // if(Instruction *I = dyn_cast<Instruction>(GEPValueMap[ptr])){
+                        //     if(AllocaInst *AI = dyn_cast<AllocaInst>(I)){
+                        //         if(AI->getAllocatedType()->isStructTy()){
+                        //             if(ConstantInt *CI = dyn_cast<ConstantInt>(GEPI->getOperand(2))){
+                        //                 uint64_t Idx = CI->getZExtValue();
+                        //                 errs() << GEPValueMap[ptr]->getName() << "._element_" << Idx << "\n";
+                        //             }
+                        //         }
+                        //     }
+                        // }
                         if(GEPValueMap.find(ptr) != GEPValueMap.end())
                             ptr = GEPValueMap[ptr];
                     }
@@ -413,7 +470,7 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                             string temp = getTempPointer();
                             TempValues[v] = temp;
                             valueName = temp;
- 
+                           	//errs() << "newNode: " << temp << "\n";
                         }
                         else{
                             valueName = TempValues[v];
@@ -483,12 +540,19 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                     Function *FuncCalled = CI->getCalledFunction();
 
                     string calledFuncName = FuncCalled->getName().str();
-
+                    // Value *retValue = CI->getReturnedArgOperand();
+                    // errs() << "return value: " << retValue->getName() << "\n";
                     Value *CalledValue = CI;
                     
+                    //errs() <<"999999 : " << CalledValue->getName() << "\n";
                     if (CalledValue->hasName()) {
                         //errs() << "Call:" << CalledValue->getName() << "\n";
                         callValue.push_back(CalledValue);
+                    	// if(CalledValue->getType()->isPointerTy())
+	                    //     ;
+	                    // else {
+	                    //     break;
+	                    // }
                     	string calledValueName = CalledValue->getName();
                     	
                         if(isPrint)
@@ -503,6 +567,15 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                          FAE = FuncCalled->arg_end(); FA != FAE; FA++, i++) {
                         
                         Value *actualArg = CI->getArgOperand(i);
+                        if(ConstantExpr *CE = dyn_cast<ConstantExpr>(actualArg)){
+                            if(CE->getOpcode() == Instruction::GetElementPtr){
+                                actualArg = CE->getOperand(0);
+                            }
+                        }
+                        while(GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(actualArg)){
+                            if(GEPValueMap.find(actualArg) != GEPValueMap.end())
+                                actualArg = GEPValueMap[actualArg];
+                        }
                         string formalArgName = calledFuncName + "@";
                         formalArgName += FA->getName();
                         addNodeValue(formalArgName, isPrint);
@@ -520,7 +593,12 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                         if(actualArg->getType()->isPointerTy())
                             ;
                         else {
-                            errs() << "not Pointer:" << actualArgName << "\n";
+                            if(isPrint)
+                                errs() << "not Pointer:" << actualArgName << "\n";
+                        }
+                        if(isa<GlobalVariable>(actualArg)){
+                            actualArgName = "_global_@";
+                            actualArgName += actualArg->getName();
                         }
                         CallValueBind[formalArgName].push_back(actualArgName);
                     }
