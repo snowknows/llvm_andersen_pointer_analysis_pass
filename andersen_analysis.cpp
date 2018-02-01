@@ -6,6 +6,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <set>
 #include <list>
+#include <fstream>
 #include "andersen.cpp" 
 
 using namespace llvm;
@@ -16,7 +17,9 @@ public:
     static char ID;
     AndersenPA() : ModulePass(ID) {}
     bool runOnModule(Module &M) {
-       errs() << "Andersen Alias Analysis: \n\n";
+        string filename = M.getName().str();
+        filename = filename.substr(0,filename.find(".bc"));
+        errs() << "Andersen Alias Analysis: \n\n";
 //        errs().write_escaped(M.getName()) << "\n";
     	//M.dump();
         for(Module::global_iterator G = M.global_begin(), GE = M.global_end(); G != GE; G++){
@@ -32,7 +35,7 @@ public:
     	for (Module::iterator F = M.begin(), FE = M.end(); F != FE; F++) {
             createInitialConstraints(*F, false);
         }
-     //    printInfo(nodes, constraints, edges);
+        //printInfo(nodes, constraints, edges);
 
 
         solveCallBind(false);
@@ -51,7 +54,8 @@ public:
 	    }
         //init(nodes, constraints, edges, workQueue);
 	    calculateConstraints(nodes, constraints, edges, workQueue, false);
-	    getPointToInfo(nodes, nodeToPtrs, true);
+	    getPointToInfo(nodes, nodeToPtrs, false);
+        writeToFile(filename + "_pointer.txt");
     	return false;
 	}
 	void createInitialConstraints(Function &F, bool isPrint);
@@ -73,6 +77,21 @@ private:
     map<Value *, Value *> GEPValueMap;
     map<Value *, string> StructToElememt;
     vector<string> ElementToObject; 
+
+    void writeToFile(string filename){
+        ofstream ofile;
+        ofile.open(filename);
+        for(map<string, vector<string>>::iterator i = nodeToPtrs.begin(), e = nodeToPtrs.end(); i != e; i++){
+            if(!i->second.empty()){
+                 ofile << i->first;
+                for(vector<string>::iterator vi = (i->second).begin(), ve = (i->second).end(); vi != ve; vi++){
+                   ofile << " " << (*vi);
+                }
+                ofile << "\n";
+            }
+        }
+        ofile.close();
+    }
 
 	string getTempPointer(){
 		static string tempName = "_TEMP_";
@@ -139,13 +158,18 @@ private:
         // }
         if(isPrint)
             errs() << "solve call bind in nodes:\n";
-        for(set<Pointer>::iterator i = nodes.begin(); i != nodes.end(); i++){
+        for(set<Pointer>::iterator i = nodes.begin(); i != nodes.end();){
             if(CallValueBind.find((*i).sid) != CallValueBind.end() && !CallValueBind[(*i).sid].empty()){
                 if(isPrint)
                     errs() << "delete node: " << (*i).sid << "\n";
-                nodes.erase(i);
+                set<Pointer>::iterator e = i;
+                i++;
+                nodes.erase(e);
+                continue;
             }
+            i++;
         }
+        //errs() << "solve bind finished.\n";
     }
     void doRobust(bool isPrint){
         for(set<Pointer>::iterator i = nodes.begin(), e = nodes.end(); i != e; i++){
@@ -168,21 +192,23 @@ private:
 void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
 
 //    StringRef FuncName = F.getName();
-    string argc = "main@argc";  
-    string argc_obj = getObject();
-    addNodeValue(argc, isPrint);
-    addNodeValue(argc_obj, isPrint);
-    addrNode(argc, argc_obj, nodes);
-    if(isPrint)
-        errs() << "addrNode: " <<  argc  << " = &" << argc_obj << "\n";
+    if(F.getName().str() == "main"){
+        string argc = "main@argc";  
+        string argc_obj = getObject();
+        addNodeValue(argc, isPrint);
+        addNodeValue(argc_obj, isPrint);
+        addrNode(argc, argc_obj, nodes);
+        if(isPrint)
+            errs() << "addrNode: " <<  argc  << " = &" << argc_obj << "\n";
 
-    string argv = "main@argv";
-    string argv_obj = getObject();
-    addNodeValue(argv, isPrint);
-    addNodeValue(argv_obj, isPrint);
-    addrNode(argv, argv_obj, nodes);
-    if(isPrint)
-        errs() << "addrNode: " <<  argv  << " = &" << argv_obj << "\n";
+        string argv = "main@argv";
+        string argv_obj = getObject();
+        addNodeValue(argv, isPrint);
+        addNodeValue(argv_obj, isPrint);
+        addrNode(argv, argv_obj, nodes);
+        if(isPrint)
+            errs() << "addrNode: " <<  argv  << " = &" << argv_obj << "\n";
+    }
 
     for (Function::iterator B = F.begin(), BE = F.end(); B != BE; B++) {
     	string funcName = F.getName().str();
@@ -556,7 +582,7 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                     	string calledValueName = CalledValue->getName();
                     	
                         if(isPrint)
-                            errs() << "addEdge: " << calledValueName << " = " << calledFuncName << "\n";
+                            errs() << "addEdge: " << calledValueName << " = #" << calledFuncName << "\n";
                         addNodeValue(calledValueName, isPrint);
                         addNodeValue("#" + calledFuncName, isPrint);
                         addEdge("#" + calledFuncName, calledValueName, edges);
@@ -609,9 +635,10 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                 	ReturnInst *RI = dyn_cast<ReturnInst>(I);
                 	if (RI->getNumOperands() != 0) {
                         Value *retVal = RI->getOperand(0);
-                        string returnName;
+                        string returnName = "";
                         if (retVal->hasName()) {
-                        	returnName = funcName + "@";
+                            if(find(callValue.begin(), callValue.end(), retVal) == callValue.end())
+                        	   returnName = funcName + "@";
                             returnName += retVal->getName();
                         }else
                         	returnName = TempValues[retVal];
@@ -619,7 +646,7 @@ void AndersenPA::createInitialConstraints(Function &F, bool isPrint) {
                         if(!returnName.empty()){
                         	
                             if(isPrint)
-                                errs() << "addEdge : " << funcName << " = " << returnName << "\n";
+                                errs() << "addEdge : #" << funcName << " = " << returnName << "\n";
                             addNodeValue("#" + funcName, isPrint);
                             addNodeValue(returnName, isPrint);
                             addEdge(returnName, "#" + funcName, edges);
