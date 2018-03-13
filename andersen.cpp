@@ -414,61 +414,61 @@ bool isContainAt(const string s){
     return false;
 }
 
-void getPointToInfo(set<Pointer> &nodes, map<string, vector<string>> &nodeToPtrs, bool isPrint){
-    /*it's a translate function only for llvm pass.
-    because llvm's pointer and variable are all connected to it's memory object,
-    so we need to trainslate the memory relationship to pointer-to relationship.
+// void getPointToInfo(set<Pointer> &nodes, map<string, vector<string>> &nodeToPtrs, bool isPrint){
+//     /*it's a translate function only for llvm pass.
+//     because llvm's pointer and variable are all connected to it's memory object,
+//     so we need to trainslate the memory relationship to pointer-to relationship.
 
-    nodes: all pointer and variable nodes
-    nodeToPtrs: the result pointer-to relations,pointer and it's pts
-    isPrint:whether to print running imformation
-    */
-    set<Pointer>::iterator i,e;
-    map<string, vector<string> > ObjectToValue; //object to it's address name, that is, variable or pointer
+//     nodes: all pointer and variable nodes
+//     nodeToPtrs: the result pointer-to relations,pointer and it's pts
+//     isPrint:whether to print running imformation
+//     */
+//     set<Pointer>::iterator i,e;
+//     map<string, vector<string> > ObjectToValue; //object to it's address name, that is, variable or pointer
 
-    for(i = nodes.begin(), e = nodes.end(); i != e; i++){
-        //construct ObjectToValue from nodes
-        if(isContainAt((*i).sid)){
-            set<Pointer> pts = (*i).pts;
-            string objname = (*(pts.begin())).sid;
-            ObjectToValue[objname].push_back((*i).sid);
+//     for(i = nodes.begin(), e = nodes.end(); i != e; i++){
+//         //construct ObjectToValue from nodes
+//         if(isContainAt((*i).sid)){
+//             set<Pointer> pts = (*i).pts;
+//             string objname = (*(pts.begin())).sid;
+//             ObjectToValue[objname].push_back((*i).sid);
 
-        }
-    }
-    for(i = nodes.begin(), e = nodes.end(); i != e; i++){
-        if(isContainAt((*i).sid)){
-            set<Pointer> pts = (*i).pts;
-            if(!pts.empty()){
-                string objname = (*(pts.begin())).sid;
-                set<Pointer> objpts = getPts(nodes, objname); // get object's pts
-                set<Pointer>::iterator si,se;
-                string vname = (*i).sid.substr(0, (*i).sid.find("addr") - 1); //convert p.addr to p
-                vector<string> toPtrs; //contains point-to variables
+//         }
+//     }
+//     for(i = nodes.begin(), e = nodes.end(); i != e; i++){
+//         if(isContainAt((*i).sid)){
+//             set<Pointer> pts = (*i).pts;
+//             if(!pts.empty()){
+//                 string objname = (*(pts.begin())).sid;
+//                 set<Pointer> objpts = getPts(nodes, objname); // get object's pts
+//                 set<Pointer>::iterator si,se;
+//                 string vname = (*i).sid.substr(0, (*i).sid.find("addr") - 1); //convert p.addr to p
+//                 vector<string> toPtrs; //contains point-to variables
 
-                for(si = objpts.begin(), se = objpts.end(); si != se; si++){
-                    string toobjname = (*si).sid;
-                    vector<string> toValue = ObjectToValue[toobjname];
-                    vector<string>::iterator vi,ve;
-                    for(vi = toValue.begin(), ve = toValue.end(); vi != ve; vi++){
-                        toPtrs.push_back(*vi);
-                    }
-                }
-                nodeToPtrs[vname] = toPtrs; //pointer to variables map
-            }
+//                 for(si = objpts.begin(), se = objpts.end(); si != se; si++){
+//                     string toobjname = (*si).sid;
+//                     vector<string> toValue = ObjectToValue[toobjname];
+//                     vector<string>::iterator vi,ve;
+//                     for(vi = toValue.begin(), ve = toValue.end(); vi != ve; vi++){
+//                         toPtrs.push_back(*vi);
+//                     }
+//                 }
+//                 nodeToPtrs[vname] = toPtrs; //pointer to variables map
+//             }
 
-        }
-    }
-    if(isPrint){
-        //print pointer and it's pts
-        //variable's pts in empty.
-        for(map<string, vector<string>>::iterator mi = nodeToPtrs.begin(), me = nodeToPtrs.end(); mi != me; mi++){
-            cout << mi->first << " -> {";
-            for(vector<string>::iterator vi = mi->second.begin(), ve = mi->second.end(); vi != ve; vi++)
-                cout << (*vi) << ", ";
-            cout << "}\n";
-        }
-    }  
-}
+//         }
+//     }
+//     if(isPrint){
+//         //print pointer and it's pts
+//         //variable's pts in empty.
+//         for(map<string, vector<string>>::iterator mi = nodeToPtrs.begin(), me = nodeToPtrs.end(); mi != me; mi++){
+//             cout << mi->first << " -> {";
+//             for(vector<string>::iterator vi = mi->second.begin(), ve = mi->second.end(); vi != ve; vi++)
+//                 cout << (*vi) << ", ";
+//             cout << "}\n";
+//         }
+//     }  
+// }
 
 int main(){
     set<Pointer> nodes;
@@ -480,5 +480,5 @@ int main(){
 
     init(nodes, constraints, edges, workQueue);
     calculateConstraints(nodes, constraints, edges, workQueue, true);
-    getPointToInfo(nodes, nodeToPtrs, true);   
+    //getPointToInfo(nodes, nodeToPtrs, true);   
 }
